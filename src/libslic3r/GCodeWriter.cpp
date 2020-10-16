@@ -155,7 +155,9 @@ std::string GCodeWriter::set_fan(unsigned int speed, bool dont_save)
             gcode << "\n";
         } else {
             if (FLAVOR_IS(gcfMakerWare) || FLAVOR_IS(gcfSailfish)) {
-                gcode << "M126";
+                gcode << "M126 ";
+                gcode << "S";
+                gcode << speed;
             } else {
                 gcode << "M106 ";
                 if (FLAVOR_IS(gcfMach3) || FLAVOR_IS(gcfMachinekit)) {
