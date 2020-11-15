@@ -302,6 +302,9 @@ void GCodeViewer::load(const GCodeProcessor::Result& gcode_result, const Print& 
     reset();
 
     load_toolpaths(gcode_result);
+    if (m_layers_zs.empty())
+        return;
+
     if (wxGetApp().is_editor())
         load_shells(print, initialized);
     else {
@@ -437,8 +440,39 @@ void GCodeViewer::render() const
     auto init_gl_data = [this]() {
         static bool first_run = true;
         if (first_run) {
+            // initializes opengl data of TBuffers
+            for (size_t i = 0; i < m_buffers.size(); ++i) {
+                TBuffer& buffer = m_buffers[i];
+                switch (buffer_type(i))
+                {
+                default: { break; }
+                case EMoveType::Tool_change:
+                case EMoveType::Color_change:
+                case EMoveType::Pause_Print:
+                case EMoveType::Custom_GCode:
+                case EMoveType::Retract:
+                case EMoveType::Unretract:
+                {
+                    buffer.shader = wxGetApp().is_glsl_version_greater_or_equal_to(1, 20) ? "options_120" : "options_110";
+                    break;
+                }
+                case EMoveType::Extrude:
+                {
+                    buffer.shader = "gouraud_light";
+                    break;
+                }
+                case EMoveType::Travel:
+                {
+                    buffer.shader = "toolpaths_lines";
+                    break;
+                }
+                }
+            }
+
+            // initializes tool marker
             m_sequential_view.marker.init();
 
+            // initializes point sizes
             std::array<int, 2> point_sizes;
             ::glGetIntegerv(GL_ALIASED_POINT_SIZE_RANGE, point_sizes.data());
             m_detected_point_sizes = { static_cast<float>(point_sizes[0]), static_cast<float>(point_sizes[1]) };
@@ -459,8 +493,10 @@ void GCodeViewer::render() const
 
     glsafe(::glEnable(GL_DEPTH_TEST));
     render_toolpaths();
-    m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
-    m_sequential_view.marker.render();
+    if (m_sequential_view.current.last != m_sequential_view.endpoints.last) {
+        m_sequential_view.marker.set_world_position(m_sequential_view.current_position);
+        m_sequential_view.marker.render();
+    }
     render_shells();
     render_legend();
 #if ENABLE_GCODE_VIEWER_STATISTICS
@@ -874,6 +910,7 @@ void GCodeViewer::init()
     if (m_initialized)
         return;
 
+    // initializes non opengl data of TBuffers
     for (size_t i = 0; i < m_buffers.size(); ++i) {
         TBuffer& buffer = m_buffers[i];
         switch (buffer_type(i))
@@ -888,21 +925,18 @@ void GCodeViewer::init()
         {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Point;
             buffer.vertices.format = VBuffer::EFormat::Position;
-            buffer.shader = wxGetApp().is_glsl_version_greater_or_equal_to(1, 20) ? "options_120" : "options_110";
             break;
         }
         case EMoveType::Extrude:
         {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Triangle;
             buffer.vertices.format = VBuffer::EFormat::PositionNormal3;
-            buffer.shader = "gouraud_light";
             break;
         }
         case EMoveType::Travel:
         {
             buffer.render_primitive_type = TBuffer::ERenderPrimitiveType::Line;
             buffer.vertices.format = VBuffer::EFormat::PositionNormal1;
-            buffer.shader = "toolpaths_lines";
             break;
         }
         }
@@ -1448,6 +1482,11 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
         }
     }
 
+    if (progress_dialog != nullptr) {
+        progress_dialog->Update(100, "");
+        progress_dialog->Fit();
+    }
+
     log_memory_usage("Loaded G-code generated indices buffers, ", vertices, indices);
 
     // toolpaths data -> send indices data to gpu
@@ -1521,7 +1560,8 @@ void GCodeViewer::load_toolpaths(const GCodeProcessor::Result& gcode_result)
     }
 
     // set layers z range
-    m_layers_z_range = { m_layers_zs.front(), m_layers_zs.back() };
+    if (!m_layers_zs.empty())
+        m_layers_z_range = { m_layers_zs.front(), m_layers_zs.back() };
 
     // roles -> remove duplicates
     std::sort(m_roles.begin(), m_roles.end());
@@ -2258,6 +2298,7 @@ void GCodeViewer::render_legend() const
                     m_extrusions.role_visibility_flags = visible ? m_extrusions.role_visibility_flags & ~(1 << role) : m_extrusions.role_visibility_flags | (1 << role);
                     // update buffers' render paths
                     refresh_render_paths(false, false);
+                    wxGetApp().plater()->update_preview_moves_slider();
                     wxGetApp().plater()->get_current_canvas3D()->set_as_dirty();
                     wxGetApp().plater()->update_preview_bottom_toolbar();
                 }
@@ -2526,7 +2567,7 @@ void GCodeViewer::render_legend() const
 
         // items
         add_option(EMoveType::Retract, EOptionsColors::Retractions, _u8L("Retractions"));
-        add_option(EMoveType::Unretract, EOptionsColors::Unretractions, _u8L("Unretractions"));
+        add_option(EMoveType::Unretract, EOptionsColors::Unretractions, _u8L("Deretractions"));
         add_option(EMoveType::Tool_change, EOptionsColors::ToolChanges, _u8L("Tool changes"));
         add_option(EMoveType::Color_change, EOptionsColors::ColorChanges, _u8L("Color changes"));
         add_option(EMoveType::Pause_Print, EOptionsColors::PausePrints, _u8L("Pause prints"));

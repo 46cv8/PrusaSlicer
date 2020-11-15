@@ -578,7 +578,7 @@ struct Sidebar::priv
     wxButton *btn_export_gcode;
     wxButton *btn_reslice;
     ScalableButton *btn_send_gcode;
-    ScalableButton *btn_eject_device;
+    //ScalableButton *btn_eject_device;
 	ScalableButton* btn_export_gcode_removable; //exports to removable drives (appears only if removable drive is connected)
 
     bool                is_collapsed {false};
@@ -750,13 +750,14 @@ Sidebar::Sidebar(Plater *parent)
         (*btn)->Hide();
     };
 
-    init_scalable_btn(&p->btn_send_gcode   , "export_gcode", _L("Send to printer") + "\tCtrl+Shift+G");
-    init_scalable_btn(&p->btn_eject_device, "eject_sd"       , _L("Remove device") + "\tCtrl+T");
-	init_scalable_btn(&p->btn_export_gcode_removable, "export_to_sd", _L("Export to SD card / Flash drive") + "\tCtrl+U");
+    init_scalable_btn(&p->btn_send_gcode   , "export_gcode", _L("Send to printer ") + GUI::shortkey_ctrl_prefix() + "Shift+G");
+//    init_scalable_btn(&p->btn_eject_device, "eject_sd"       , _L("Remove device ") + GUI::shortkey_ctrl_prefix() + "T");
+	init_scalable_btn(&p->btn_export_gcode_removable, "export_to_sd", _L("Export to SD card / Flash drive ") + GUI::shortkey_ctrl_prefix() + "U");
 
     // regular buttons "Slice now" and "Export G-code" 
 
-    const int scaled_height = p->btn_eject_device->GetBitmapHeight() + 4;
+//    const int scaled_height = p->btn_eject_device->GetBitmapHeight() + 4;
+    const int scaled_height = p->btn_export_gcode_removable->GetBitmapHeight() + 4;
     auto init_btn = [this](wxButton **btn, wxString label, const int button_height) {
         *btn = new wxButton(this, wxID_ANY, label, wxDefaultPosition,
                             wxSize(-1, button_height), wxBU_EXACTFIT);
@@ -774,7 +775,7 @@ Sidebar::Sidebar(Plater *parent)
     complect_btns_sizer->Add(p->btn_export_gcode, 1, wxEXPAND);
     complect_btns_sizer->Add(p->btn_send_gcode);
 	complect_btns_sizer->Add(p->btn_export_gcode_removable);
-    complect_btns_sizer->Add(p->btn_eject_device);
+//    complect_btns_sizer->Add(p->btn_eject_device);
 	
 
     btns_sizer->Add(p->btn_reslice, 0, wxEXPAND | wxTOP, margin_5);
@@ -797,7 +798,7 @@ Sidebar::Sidebar(Plater *parent)
         p->plater->select_view_3D("Preview");
     });
     p->btn_send_gcode->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { p->plater->send_gcode(); });
-    p->btn_eject_device->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { p->plater->eject_drive(); });
+//    p->btn_eject_device->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { p->plater->eject_drive(); });
 	p->btn_export_gcode_removable->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { p->plater->export_gcode(true); });
 }
 
@@ -940,9 +941,9 @@ void Sidebar::msw_rescale()
     p->object_info->msw_rescale();
 
     p->btn_send_gcode->msw_rescale();
-    p->btn_eject_device->msw_rescale();
+//    p->btn_eject_device->msw_rescale();
 	p->btn_export_gcode_removable->msw_rescale();
-    const int scaled_height = p->btn_eject_device->GetBitmap().GetHeight() + 4;
+    const int scaled_height = p->btn_export_gcode_removable->GetBitmap().GetHeight() + 4;
     p->btn_export_gcode->SetMinSize(wxSize(-1, scaled_height));
     p->btn_reslice     ->SetMinSize(wxSize(-1, scaled_height));
 
@@ -965,7 +966,7 @@ void Sidebar::sys_color_changed()
 
     // btn...->msw_rescale() updates icon on button, so use it
     p->btn_send_gcode->msw_rescale();
-    p->btn_eject_device->msw_rescale();
+//    p->btn_eject_device->msw_rescale();
     p->btn_export_gcode_removable->msw_rescale();
 
     p->scrolled->Layout();
@@ -1268,7 +1269,7 @@ void Sidebar::enable_buttons(bool enable)
     p->btn_reslice->Enable(enable);
     p->btn_export_gcode->Enable(enable);
     p->btn_send_gcode->Enable(enable);
-    p->btn_eject_device->Enable(enable);
+//    p->btn_eject_device->Enable(enable);
 	p->btn_export_gcode_removable->Enable(enable);
 }
 
@@ -1276,8 +1277,8 @@ bool Sidebar::show_reslice(bool show)          const { return p->btn_reslice->Sh
 bool Sidebar::show_export(bool show)           const { return p->btn_export_gcode->Show(show); }
 bool Sidebar::show_send(bool show)             const { return p->btn_send_gcode->Show(show); }
 bool Sidebar::show_export_removable(bool show) const { return p->btn_export_gcode_removable->Show(show); }
-bool Sidebar::show_eject(bool show)            const { return p->btn_eject_device->Show(show); }
-bool Sidebar::get_eject_shown()                const { return p->btn_eject_device->IsShown(); }
+//bool Sidebar::show_eject(bool show)            const { return p->btn_eject_device->Show(show); }
+//bool Sidebar::get_eject_shown()                const { return p->btn_eject_device->IsShown(); }
 
 bool Sidebar::is_multifilament()
 {
@@ -1407,8 +1408,8 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
             return false;
         }
         else if (paths.size() == 1) {
-                plater->load_gcode(from_path(paths.front()));
-                return true;
+            plater->load_gcode(from_path(paths.front()));
+            return true;
         } 
         return false;
     }
@@ -1467,6 +1468,13 @@ bool PlaterDropTarget::OnDropFiles(wxCoord x, wxCoord y, const wxArrayString &fi
 
     return true;
 }
+
+// State to manage showing after export notifications and device ejecting
+enum ExportingStatus{
+    NOT_EXPORTING,
+    EXPORTING_TO_REMOVABLE,
+    EXPORTING_TO_LOCAL
+};
 
 // Plater / private
 struct Plater::priv
@@ -1620,7 +1628,7 @@ struct Plater::priv
 #endif // ENABLE_GCODE_VIEWER
 
     void reset_all_gizmos();
-    void update_ui_from_settings();
+    void update_ui_from_settings(bool apply_free_camera_correction = true);
     void update_main_toolbar_tooltips();
     std::shared_ptr<ProgressStatusBar> statusbar();
     std::string get_config(const std::string &key) const;
@@ -1770,7 +1778,9 @@ struct Plater::priv
     // Caching last value of show_action_buttons parameter for show_action_buttons(), so that a callback which does not know this state will not override it.
     mutable bool    			ready_to_slice = { false };
     // Flag indicating that the G-code export targets a removable device, therefore the show_action_buttons() needs to be called at any case when the background processing finishes.
-    bool 						writing_to_removable_device = { false };
+    ExportingStatus             exporting_status { NOT_EXPORTING };
+    std::string                 last_output_path;
+    std::string                 last_output_dir_path;
     bool                        inside_snapshot_capture() { return m_prevent_snapshots != 0; }
 	bool                        process_completed_with_error { false };
 private:
@@ -1818,8 +1828,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     , main_frame(main_frame)
     , config(Slic3r::DynamicPrintConfig::new_from_defaults_keys({
         "bed_shape", "bed_custom_texture", "bed_custom_model", "complete_objects", "duplicate_distance", "extruder_clearance_radius", "skirts", "skirt_distance",
-        "brim_width", "variable_layer_height", "serial_port", "serial_speed", "host_type", "print_host",
-        "printhost_apikey", "printhost_cafile", "nozzle_diameter", "single_extruder_multi_material",
+        "brim_width", "variable_layer_height", "nozzle_diameter", "single_extruder_multi_material",
         "wipe_tower", "wipe_tower_x", "wipe_tower_y", "wipe_tower_width", "wipe_tower_rotation_angle",
         "extruder_colour", "filament_colour", "max_print_height", "printer_model", "printer_technology",
         // These values are necessary to construct SlicingParameters by the Canvas3D variable layer height editor.
@@ -2002,6 +2011,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 #endif // ENABLE_GCODE_VIEWER
 
     // updates camera type from .ini file
+    camera.enable_update_config_on_type_change(true);
     camera.set_type(get_config("use_perspective_camera"));
 
     // Load the 3DConnexion device database.
@@ -2015,7 +2025,12 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
     // is one of the 3D Mouse vendors (3DConnexion or Logitech).
     this->q->Bind(EVT_HID_DEVICE_ATTACHED, [this](HIDDeviceAttachedEvent &evt) {
     	mouse3d_controller.device_attached(evt.data);
-    });
+        });
+#if ENABLE_CTRL_M_ON_WINDOWS
+    this->q->Bind(EVT_HID_DEVICE_DETACHED, [this](HIDDeviceAttachedEvent& evt) {
+        mouse3d_controller.device_detached(evt.data);
+        });
+#endif // ENABLE_CTRL_M_ON_WINDOWS
 #endif /* _WIN32 */
 
 	notification_manager = new NotificationManager(this->q);
@@ -2028,7 +2043,7 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 	    this->q->Bind(EVT_REMOVABLE_DRIVE_EJECTED, [this, q](RemovableDriveEjectEvent &evt) {
 		    if (evt.data.second) {
 			    this->show_action_buttons(this->ready_to_slice);
-			    notification_manager->push_notification(format(_L("Unmounting successful. The device %s(%s) can now be safely removed from the computer."),evt.data.first.name, evt.data.first.path),
+			    notification_manager->push_notification(format(_L("Successfully unmounted. The device %s(%s) can now be safely removed from the computer."),evt.data.first.name, evt.data.first.path),
 				                                        NotificationManager::NotificationLevel::RegularNotification, *q->get_current_canvas3D());
 		    } else {
 			    notification_manager->push_notification(format(_L("Ejecting of device %s(%s) has failed."), evt.data.first.name, evt.data.first.path),
@@ -2037,9 +2052,8 @@ Plater::priv::priv(Plater *q, MainFrame *main_frame)
 	    });
         this->q->Bind(EVT_REMOVABLE_DRIVES_CHANGED, [this, q](RemovableDrivesChangedEvent &) {
 		    this->show_action_buttons(this->ready_to_slice); 
-		    if (!this->sidebar->get_eject_shown()) {
-			    notification_manager->close_notification_of_type(NotificationType::ExportToRemovableFinished);
-		    }
+		    // Close notification ExportingFinished but only if last export was to removable
+		    notification_manager->device_ejected();
 	    });
         // Start the background thread and register this window as a target for update events.
         wxGetApp().removable_drive_manager()->init(this->q);
@@ -2122,7 +2136,7 @@ void Plater::priv::select_view_3D(const std::string& name)
         set_current_panel(preview);
 
 #if ENABLE_GCODE_VIEWER
-    wxGetApp().update_ui_from_settings();
+    wxGetApp().update_ui_from_settings(false);
 #endif // ENABLE_GCODE_VIEWER
 }
 
@@ -2155,10 +2169,10 @@ void Plater::priv::reset_all_gizmos()
 
 // Called after the Preferences dialog is closed and the program settings are saved.
 // Update the UI based on the current preferences.
-void Plater::priv::update_ui_from_settings()
+void Plater::priv::update_ui_from_settings(bool apply_free_camera_correction)
 {
     camera.set_type(wxGetApp().app_config->get("use_perspective_camera"));
-    if (wxGetApp().app_config->get("use_free_camera") != "1")
+    if (apply_free_camera_correction && wxGetApp().app_config->get("use_free_camera") != "1")
         camera.recover_from_free_camera();
 
     view3D->get_canvas3d()->update_ui_from_settings();
@@ -2906,6 +2920,7 @@ unsigned int Plater::priv::update_background_process(bool force_validation, bool
         const wxString invalid_str = _L("Invalid data");
         for (auto btn : {ActionButtonType::abReslice, ActionButtonType::abSendGCode, ActionButtonType::abExport})
             sidebar->set_btn_label(btn, invalid_str);
+        process_completed_with_error = true;
     }
     else
     {
@@ -3296,16 +3311,14 @@ void Plater::priv::set_current_panel(wxPanel* panel)
     if (current_panel == panel)
         return;
 
+    wxPanel* old_panel = current_panel;
     current_panel = panel;
     // to reduce flickering when changing view, first set as visible the new current panel
-    for (wxPanel* p : panels)
-    {
-        if (p == current_panel)
-        {
+    for (wxPanel* p : panels) {
+        if (p == current_panel) {
 #ifdef __WXMAC__
             // On Mac we need also to force a render to avoid flickering when changing view
-            if (force_render)
-            {
+            if (force_render) {
                 if (p == view3D)
                     dynamic_cast<View3D*>(p)->get_canvas3d()->render();
                 else if (p == preview)
@@ -3316,21 +3329,22 @@ void Plater::priv::set_current_panel(wxPanel* panel)
         }
     }
     // then set to invisible the other
-    for (wxPanel* p : panels)
-    {
+    for (wxPanel* p : panels) {
         if (p != current_panel)
             p->Hide();
     }
 
     panel_sizer->Layout();
 
-    if (current_panel == view3D)
-    {
-        if (view3D->is_reload_delayed())
-        {
+    if (current_panel == view3D) {
+        if (old_panel == preview)
+            preview->get_canvas3d()->unbind_event_handlers();
+
+        view3D->get_canvas3d()->bind_event_handlers();
+
+        if (view3D->is_reload_delayed()) {
             // Delayed loading of the 3D scene.
-            if (this->printer_technology == ptSLA)
-            {
+            if (this->printer_technology == ptSLA) {
                 // Update the SLAPrint from the current Model, so that the reload_scene()
                 // pulls the correct data.
                 this->update_restart_background_process(true, false);
@@ -3344,8 +3358,12 @@ void Plater::priv::set_current_panel(wxPanel* panel)
         if(notification_manager != nullptr)
             notification_manager->set_in_preview(false);
     }
-    else if (current_panel == preview)
-    {
+    else if (current_panel == preview) {
+        if (old_panel == view3D)
+            view3D->get_canvas3d()->unbind_event_handlers();
+
+        preview->get_canvas3d()->bind_event_handlers();
+
         // see: Plater::priv::object_list_changed()
         // FIXME: it may be better to have a single function making this check and let it be called wherever needed
         bool export_in_progress = this->background_process.is_export_scheduled();
@@ -3502,7 +3520,7 @@ void Plater::priv::on_slicing_completed(wxCommandEvent & evt)
 void Plater::priv::on_export_began(wxCommandEvent& evt)
 {
 	if (show_warning_dialog)
-		warnings_dialog();
+		warnings_dialog();  
 }
 void Plater::priv::on_slicing_began()
 {
@@ -3580,10 +3598,14 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
         } else
 		  notification_manager->push_slicing_error_notification(message, *q->get_current_canvas3D());
         this->statusbar()->set_status_text(from_u8(message));
-		const wxString invalid_str = _L("Invalid data");
-		for (auto btn : { ActionButtonType::abReslice, ActionButtonType::abSendGCode, ActionButtonType::abExport })
-			sidebar->set_btn_label(btn, invalid_str);
-		process_completed_with_error = true;
+        if (evt.invalidate_plater())
+        {
+            const wxString invalid_str = _L("Invalid data");
+            for (auto btn : { ActionButtonType::abReslice, ActionButtonType::abSendGCode, ActionButtonType::abExport })
+                sidebar->set_btn_label(btn, invalid_str);
+            process_completed_with_error = true;
+        }
+		
     }
     if (evt.cancelled())
         this->statusbar()->set_status_text(_L("Cancelled"));
@@ -3613,17 +3635,19 @@ void Plater::priv::on_process_completed(SlicingProcessCompletedEvent &evt)
         if (wxGetApp().get_mode() == comSimple)
             sidebar->set_btn_label(ActionButtonType::abReslice, "Slice now");
         show_action_buttons(true);
+    } else {
+        if(wxGetApp().get_mode() == comSimple) {
+            show_action_buttons(false);
+        }
+        // If writing to removable drive was scheduled, show notification with eject button
+        if (exporting_status == ExportingStatus::EXPORTING_TO_REMOVABLE && !this->process_completed_with_error) {
+            show_action_buttons(false);
+            notification_manager->push_exporting_finished_notification(*q->get_current_canvas3D(), last_output_path, last_output_dir_path, true);
+            wxGetApp().removable_drive_manager()->set_exporting_finished(true);
+        }else if (exporting_status == ExportingStatus::EXPORTING_TO_LOCAL && !this->process_completed_with_error)
+            notification_manager->push_exporting_finished_notification(*q->get_current_canvas3D(), last_output_path, last_output_dir_path, false);
     }
-    else if (wxGetApp().get_mode() == comSimple)
-	{
-		show_action_buttons(false);
-	}
-	else if (this->writing_to_removable_device)
-	{
-		show_action_buttons(false);
-		notification_manager->push_notification(NotificationType::ExportToRemovableFinished, *q->get_current_canvas3D());
-	}
-	this->writing_to_removable_device = false;
+    exporting_status = ExportingStatus::NOT_EXPORTING;
 }
 
 void Plater::priv::on_layer_editing_toggled(bool enable)
@@ -4284,11 +4308,8 @@ void Plater::priv::show_action_buttons(const bool ready_to_slice) const
     wxWindowUpdateLocker noUpdater(sidebar);
 
     DynamicPrintConfig* selected_printer_config = wxGetApp().preset_bundle->physical_printers.get_selected_printer_config();
-    if (!selected_printer_config)
-        selected_printer_config = config;
-
-    const auto prin_host_opt = selected_printer_config->option<ConfigOptionString>("print_host");
-    const bool send_gcode_shown = prin_host_opt != nullptr && !prin_host_opt->value.empty();
+    const auto print_host_opt = selected_printer_config ? selected_printer_config->option<ConfigOptionString>("print_host") : nullptr;
+    const bool send_gcode_shown = print_host_opt != nullptr && !print_host_opt->value.empty();
     
     // when a background processing is ON, export_btn and/or send_btn are showing
     if (wxGetApp().app_config->get("background_processing") == "1")
@@ -4297,8 +4318,8 @@ void Plater::priv::show_action_buttons(const bool ready_to_slice) const
 		if (sidebar->show_reslice(false) |
 			sidebar->show_export(true) |
 			sidebar->show_send(send_gcode_shown) |
-			sidebar->show_export_removable(removable_media_status.has_removable_drives) |
-			sidebar->show_eject(removable_media_status.has_eject))
+			sidebar->show_export_removable(removable_media_status.has_removable_drives))
+//			sidebar->show_eject(removable_media_status.has_eject))
             sidebar->Layout();
     }
     else
@@ -4309,8 +4330,8 @@ void Plater::priv::show_action_buttons(const bool ready_to_slice) const
         if (sidebar->show_reslice(ready_to_slice) |
             sidebar->show_export(!ready_to_slice) |
             sidebar->show_send(send_gcode_shown && !ready_to_slice) |
-			sidebar->show_export_removable(!ready_to_slice && removable_media_status.has_removable_drives) |
-            sidebar->show_eject(!ready_to_slice && removable_media_status.has_eject))
+			sidebar->show_export_removable(!ready_to_slice && removable_media_status.has_removable_drives))
+//            sidebar->show_eject(!ready_to_slice && removable_media_status.has_eject))
             sidebar->Layout();
     }
 }
@@ -4699,7 +4720,9 @@ void Plater::load_gcode()
 
 void Plater::load_gcode(const wxString& filename)
 {
-    if (filename.empty() || m_last_loaded_gcode == filename)
+    if (filename.empty() ||
+        (!filename.Lower().EndsWith(".gcode") && !filename.Lower().EndsWith(".g")) ||
+        m_last_loaded_gcode == filename)
         return;
 
     m_last_loaded_gcode = filename;
@@ -4722,6 +4745,14 @@ void Plater::load_gcode(const wxString& filename)
     // show results
     p->preview->reload_print(false);
     p->preview->get_canvas3d()->zoom_to_gcode();
+
+    if (p->preview->get_canvas3d()->get_gcode_layers_zs().empty()) {
+        wxMessageDialog(this, _L("The selected file") + ":\n" + filename + "\n" + _L("does not contain valid gcode."),
+            wxString(GCODEVIEWER_APP_NAME) + " - " + _L("Error while loading .gcode file"), wxCLOSE | wxICON_WARNING | wxCENTRE).ShowModal();
+        set_project_filename(wxEmptyString);
+    }
+    else
+        set_project_filename(filename);
 }
 
 void Plater::refresh_print()
@@ -4746,7 +4777,7 @@ void Plater::update() { p->update(); }
 
 void Plater::stop_jobs() { p->m_ui_jobs.stop_all(); }
 
-void Plater::update_ui_from_settings() { p->update_ui_from_settings(); }
+void Plater::update_ui_from_settings(bool apply_free_camera_correction) { p->update_ui_from_settings(apply_free_camera_correction); }
 
 void Plater::select_view(const std::string& direction) { p->select_view(direction); }
 
@@ -4939,7 +4970,7 @@ void Plater::export_gcode(bool prefer_removable)
     if (p->model.objects.empty())
         return;
 
-    if (p->process_completed_with_error)//here
+    if (p->process_completed_with_error)
         return;
 
     // If possible, remove accents from accented latin characters.
@@ -4984,12 +5015,16 @@ void Plater::export_gcode(bool prefer_removable)
 
     if (! output_path.empty()) {
 		bool path_on_removable_media = removable_drive_manager.set_and_verify_last_save_path(output_path.string());
+        p->notification_manager->new_export_began(path_on_removable_media);
+        p->exporting_status = path_on_removable_media ? ExportingStatus::EXPORTING_TO_REMOVABLE : ExportingStatus::EXPORTING_TO_LOCAL;
+        p->last_output_path = output_path.string();
+        p->last_output_dir_path = output_path.parent_path().string();
         p->export_gcode(output_path, path_on_removable_media, PrintHostJob());
         // Storing a path to AppConfig either as path to removable media or a path to internal media.
         // is_path_on_removable_drive() is called with the "true" parameter to update its internal database as the user may have shuffled the external drives
         // while the dialog was open.
         appconfig.update_last_output_dir(output_path.parent_path().string(), path_on_removable_media);
-		p->writing_to_removable_device = path_on_removable_media;
+		
 	}
 }
 
@@ -5203,6 +5238,10 @@ void Plater::export_toolpaths_to_obj() const
 
 void Plater::reslice()
 {
+    // There is "invalid data" button instead "slice now"
+    if (p->process_completed_with_error)
+        return;
+
     // Stop arrange and (or) optimize rotation tasks.
     this->stop_jobs();
 
@@ -5293,12 +5332,14 @@ void Plater::reslice_SLA_until_step(SLAPrintObjectStep step, const ModelObject &
 
 void Plater::send_gcode()
 {
-    if (p->model.objects.empty()) { return; }
-
     // if physical_printer is selected, send gcode for this printer
     DynamicPrintConfig* physical_printer_config = wxGetApp().preset_bundle->physical_printers.get_selected_printer_config();
-    PrintHostJob upload_job(physical_printer_config ? physical_printer_config : p->config);
-    if (upload_job.empty()) { return; }
+    if (! physical_printer_config || p->model.objects.empty())
+        return;
+
+    PrintHostJob upload_job(physical_printer_config);
+    if (upload_job.empty())
+        return;
 
     // Obtain default output path
     fs::path default_output_file;
@@ -5316,11 +5357,18 @@ void Plater::send_gcode()
     }
     default_output_file = fs::path(Slic3r::fold_utf8_to_ascii(default_output_file.string()));
 
-    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->can_start_print());
+    // Repetier specific: Query the server for the list of file groups.
+    wxArrayString groups;
+    {
+        wxBusyCursor wait;
+        upload_job.printhost->get_groups(groups);
+    }
+    
+    PrintHostSendDialog dlg(default_output_file, upload_job.printhost->can_start_print(), groups);
     if (dlg.ShowModal() == wxID_OK) {
         upload_job.upload_data.upload_path = dlg.filename();
         upload_job.upload_data.start_print = dlg.start_print();
-
+        upload_job.upload_data.group       = dlg.group();
         p->export_gcode(fs::path(), false, std::move(upload_job));
     }
 }

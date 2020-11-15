@@ -417,7 +417,7 @@ std::error_code rename_file(const std::string &from, const std::string &to)
 #endif
 }
 
-CopyFileResult copy_file_inner(const std::string& from, const std::string& to)
+CopyFileResult copy_file_inner(const std::string& from, const std::string& to, std::string& error_message)
 {
 	const boost::filesystem::path source(from);
 	const boost::filesystem::path target(to);
@@ -431,18 +431,25 @@ CopyFileResult copy_file_inner(const std::string& from, const std::string& to)
 	// or when the target file doesn't exist.
 	boost::system::error_code ec;
 	boost::filesystem::permissions(target, perms, ec);
+	if (ec)
+		BOOST_LOG_TRIVIAL(error) << "boost::filesystem::permisions before copy error message (this could be irrelevant message based on file system): " << ec.message();
+	ec.clear();
 	boost::filesystem::copy_file(source, target, boost::filesystem::copy_option::overwrite_if_exists, ec);
 	if (ec) {
+		error_message = ec.message();
 		return FAIL_COPY_FILE;
 	}
+	ec.clear();
 	boost::filesystem::permissions(target, perms, ec);
+	if (ec)
+		BOOST_LOG_TRIVIAL(error) << "boost::filesystem::permisions after copy error message (this could be irrelevant message based on file system): " << ec.message();
 	return SUCCESS;
 }
 
-CopyFileResult copy_file(const std::string &from, const std::string &to, const bool with_check)
+CopyFileResult copy_file(const std::string &from, const std::string &to, std::string& error_message, const bool with_check)
 {
 	std::string to_temp = to + ".tmp";
-	CopyFileResult ret_val = copy_file_inner(from,to_temp);
+	CopyFileResult ret_val = copy_file_inner(from, to_temp, error_message);
     if(ret_val == SUCCESS)
 	{
         if (with_check)

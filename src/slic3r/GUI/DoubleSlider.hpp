@@ -228,7 +228,6 @@ public:
     void    SetModeAndOnlyExtruder(const bool is_one_extruder_printed_model, const int only_extruder);
     void    SetExtruderColors(const std::vector<std::string>& extruder_colors);
 
-    void set_lower_editable(bool editable) { m_lower_editable = editable; }
     void set_render_as_disabled(bool value) { m_render_as_disabled = value; }
     bool is_rendering_as_disabled() const { return m_render_as_disabled; }
 
@@ -294,6 +293,7 @@ protected:
     void    draw_thumb_text(wxDC& dc, const wxPoint& pos, const SelectedSlider& selection) const;
 
     void    update_thumb_rect(const wxCoord begin_x, const wxCoord begin_y, const SelectedSlider& selection);
+    bool    is_lower_thumb_editable();
     bool    detect_selected_slider(const wxPoint& pt);
     void    correct_lower_value();
     void    correct_higher_value();
@@ -340,7 +340,6 @@ private:
     int         m_lower_value;
     int         m_higher_value;
 
-    bool        m_lower_editable{ true };
     bool        m_render_as_disabled{ false };
 
     ScalableBitmap    m_bmp_thumb_higher;

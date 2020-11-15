@@ -2,6 +2,7 @@
 #include "libslic3r/Utils.hpp"
 #include "AppConfig.hpp"
 #include "Exception.hpp"
+#include "Thread.hpp"
 
 #include <utility>
 #include <vector>
@@ -77,9 +78,9 @@ void AppConfig::set_defaults()
             set("single_instance", 
 #ifdef __APPLE__
                 "1"
-#else __APPLE__
+#else // __APPLE__
                 "0"
-#endif __APPLE__
+#endif // __APPLE__
                 );
 
         if (get("remember_output_path").empty())
@@ -103,6 +104,9 @@ void AppConfig::set_defaults()
 
         if (get("use_free_camera").empty())
             set("use_free_camera", "0");
+
+        if (get("reverse_mouse_wheel_zoom").empty())
+            set("reverse_mouse_wheel_zoom", "0");
 #endif // !ENABLE_GCODE_VIEWER
 
 #if ENABLE_ENVIRONMENT_MAP
@@ -123,6 +127,9 @@ void AppConfig::set_defaults()
 
     if (get("use_free_camera").empty())
         set("use_free_camera", "0");
+
+    if (get("reverse_mouse_wheel_zoom").empty())
+        set("reverse_mouse_wheel_zoom", "0");
 #endif // ENABLE_GCODE_VIEWER
 
     if (get("show_splash_screen").empty())
@@ -204,6 +211,20 @@ std::string AppConfig::load()
         m_legacy_datadir = ini_ver < Semver(1, 40, 0);
     }
 
+    // Legacy conversion
+    if (m_mode == EAppMode::Editor) {
+        // Convert [extras] "physical_printer" to [presets] "physical_printer",
+        // remove the [extras] section if it becomes empty.
+        if (auto it_section = m_storage.find("extras"); it_section != m_storage.end()) {
+            if (auto it_physical_printer = it_section->second.find("physical_printer"); it_physical_printer != it_section->second.end()) {
+                m_storage["presets"]["physical_printer"] = it_physical_printer->second;
+                it_section->second.erase(it_physical_printer);
+            }
+            if (it_section->second.empty())
+                m_storage.erase(it_section);
+        }
+    }
+
     // Override missing or keys with their defaults.
     this->set_defaults();
     m_dirty = false;
@@ -212,6 +233,13 @@ std::string AppConfig::load()
 
 void AppConfig::save()
 {
+    {
+        // Returns "undefined" if the thread naming functionality is not supported by the operating system.
+        std::optional<std::string> current_thread_name = get_current_thread_name();
+        if (current_thread_name && *current_thread_name != "slic3r_main")
+            throw CriticalException("Calling AppConfig::save() from a worker thread!");
+    }
+
     // The config is first written to a file with a PID suffix and then moved
     // to avoid race conditions with multiple instances of Slic3r
     const auto path = config_path();
@@ -420,6 +448,7 @@ void AppConfig::reset_selections()
         it->second.erase("sla_print");
         it->second.erase("sla_material");
         it->second.erase("printer");
+        it->second.erase("physical_printer");
         m_dirty = true;
     }
 }
